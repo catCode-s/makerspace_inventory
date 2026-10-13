@@ -23,7 +23,7 @@ std::string loadSql(const std::string& path) {
 int main() {
     drogon::app()
         .loadConfigFile("backend/config.local.json")
-        // check server is running
+        // check HTTP server response
         .registerHandler(
             "/api/health",
             [](const drogon::HttpRequestPtr&,
@@ -47,7 +47,7 @@ int main() {
                     loadSql("backend/sql/search_components.sql"),
                     [callback](const drogon::orm::Result& result) {
                         Json::Value components(Json::arrayValue);
-                        // group inventory rows by components to prevent duplicates
+                        // maps component ids to their index in the components array to prevent duplicates
                         std::map<std::int64_t, Json::ArrayIndex> indices;
 
                         for (const auto& row : result) {
@@ -61,11 +61,13 @@ int main() {
                                 component["requires_checkout"] = row["requires_checkout"].as<bool>();
                                 component["stock"] = Json::Value(Json::arrayValue);
 
-                                for (const auto* field : {"description", "part_number", 
-                                                          "brand", "category"}) {
+                                for (const auto* field : {
+                                    "description", "part_number", "brand", "category", 
+                                    "power_requirements", "documentation_url"
+                                }) {
                                     if (row[field].isNull())
                                         component[field] = Json::nullValue;
-                                    else
+                                    else 
                                         component[field] = row[field].as<std::string>();
                                 }
                                 auto index = components.size();

@@ -1,9 +1,13 @@
+-- search componets names, part numbers, aliases, and tags
+-- and return one row per stock location
 SELECT
     c.id,
     c.name,
     c.description,
     c.part_number,
     c.requires_checkout,
+    c.power_requirements,
+    c.documentation_url,
     b.name AS brand,
     cat.name AS category,
     i.id AS inventory_id,
