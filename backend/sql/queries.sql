@@ -1,11 +1,15 @@
+-- display all inventory records
 SELECT component_id, location_id, quantity
 FROM inventory;
 
+-- display inventory quantities by component and location
 SELECT c.name AS component, l.name AS location, i.quantity
 FROM inventory AS i
 JOIN components AS c ON i.component_id = c.id
 JOIN locations AS l ON i.location_id = l.id;
 
+-- display detailed information about a specific component
+-- (stock levels, tags, aliases, and order links)
 SELECT
     c.id,
     c.name,
@@ -65,3 +69,48 @@ WHERE c.id = 1;
 -- tags               | Bluetooth, ESP32, Micro-USB, Microcontroller, Wi-Fi
 -- aliases            | ESP32-DEVKITC-32UE, ESP32-DevKitC V4, ESP32 DevKit, ESP32 DevKitC                                                           
 -- order_links        | Digikey: https://www.digikey.com/en/products/detail/espressif-systems/ESP32-DEVKITC-32UE/12091813                           
+
+-- display components that are below their low stock threshold
+SELECT
+    c.id,
+    c.name,
+    c.low_stock_threshold,
+    COALESCE(SUM(i.quantity), 0) AS total_quantity
+FROM components AS c
+LEFT JOIN inventory AS i ON i.component_id = c.id
+WHERE c.low_stock_threshold IS NOT NULL
+GROUP BY c.id, c.name, c.low_stock_threshold
+HAVING COUNT(*) FILTER (WHERE i.stock_level IS NOT NULL) = 0
+   AND COALESCE(SUM(i.quantity), 0) < c.low_stock_threshold;
+
+-- display components that need front-stock replensihment
+WITH RECURSIVE location_tree AS (
+    SELECT id, id AS root_id
+    FROM locations
+    WHERE id IN (1, 6)
+
+    UNION
+
+    SELECT l.id, lt.root_id
+    FROM locations AS l
+    JOIN location_tree AS lt ON l.parent_id = lt.id
+)
+SELECT
+    c.id,
+    c.name,
+    COALESCE(SUM(i.quantity)
+        FILTER (WHERE lt.root_id = 1), 0) AS front_quantity,
+    COALESCE(SUM(i.quantity)
+        FILTER (WHERE lt.root_id = 6), 0) AS back_quantity,
+    COALESCE(SUM(i.quantity), 0) AS total_quantity
+FROM components AS c
+LEFT JOIN inventory AS i ON i.component_id = c.id
+LEFT JOIN location_tree AS lt ON i.location_id = lt.id
+WHERE c.low_stock_threshold IS NOT NULL
+GROUP BY c.id
+HAVING COUNT(*) FILTER (WHERE i.stock_level IS NOT NULL) = 0
+   AND COALESCE(SUM(i.quantity)
+       FILTER (WHERE lt.root_id = 1), 0) = 0
+   AND COALESCE(SUM(i.quantity)
+       FILTER (WHERE lt.root_id = 6), 0) > 0
+   AND COALESCE(SUM(i.quantity), 0) >= c.low_stock_threshold;

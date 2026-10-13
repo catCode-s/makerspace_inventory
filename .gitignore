@@ -1,2 +1,4 @@
 build/
 .env
+config.local.json
+target/

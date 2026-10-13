@@ -20,6 +20,15 @@ VALUES ('Bin 1', 'First bin from the left at Front Stock', 1),
 ('Bin 4', 'Fourth bin from the left at Front Stock', 1)
 RETURNING id;
 
+INSERT INTO locations (name, description)
+VALUES ('Backstock', 'Storage area for excess inventory')
+RETURNING id;
+
+INSERT INTO locations (name, description, parent_id)
+VALUES ('Bin Shelf', 'Shelf under bins at Frontstock', 6),
+       ('Shadow Realm', 'Storage closet near tool wall', 6)
+RETURNING id;
+
 INSERT INTO tags (name)
 VALUES ('Microcontroller'),
        ('ESP32'),
