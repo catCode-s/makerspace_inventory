@@ -148,3 +148,6 @@ CREATE TABLE stock_adjustments (
         )
     )
 );
+
+CREATE UNIQUE INDEX users_email_normalized_unique
+ON users (LOWER(BTRIM(email)));

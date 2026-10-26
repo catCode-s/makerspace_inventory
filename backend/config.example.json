@@ -1,0 +1,15 @@
+{
+    "db_clients": [
+        {
+            "name": "default",
+            "rdbms": "postgresql",
+            "host": "127.0.0.1",
+            "port": 5432,
+            "dbname": "makerspace_inventory_demo",
+            "user": "postgres",
+            "passwd": "REPLACE_WITH_YOUR_PASSWORD",
+            "is_fast": false,
+            "number_of_connections": 1
+        }
+    ]
+}

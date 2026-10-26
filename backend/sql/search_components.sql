@@ -24,11 +24,12 @@ LEFT JOIN locations AS l ON i.location_id = l.id
 LEFT JOIN locations AS p ON l.parent_id = p.id
 WHERE c.name ILIKE $1
     OR c.part_number ILIKE $1
+    OR cat.name ILIKE $1
     OR EXISTS (
         SELECT 1
         FROM aliases AS a
         WHERE a.component_id = c.id
-            AND a.alias ILIKE $1
+            AND a.alias ILIKE $1      
     )
     OR EXISTS (
         SELECT 1

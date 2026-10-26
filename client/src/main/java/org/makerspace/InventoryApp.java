@@ -4,16 +4,9 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Hyperlink;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
-import javafx.scene.control.ListView;
-import javafx.scene.control.TextArea;
-import javafx.scene.control.TextField;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 // JavaFX interface for searching components and their details
@@ -31,7 +24,6 @@ public class InventoryApp extends Application {
         Label status = new Label("Enter a name, part number, or tag.");
         ListView<Component> results = new ListView<>();
 
-        // display each components name and stock summary
         results.setCellFactory(list -> new ListCell<Component>() {
             @Override
             protected void updateItem(Component component, boolean empty) {
@@ -77,7 +69,6 @@ public class InventoryApp extends Application {
             }
         });
 
-        // update the details and documentation link when a component is selected
         results.getSelectionModel().selectedItemProperty().addListener(
             (observable, previous, component) -> {
                 documentationLink.setDisable(
@@ -130,6 +121,67 @@ public class InventoryApp extends Application {
 
         InventoryApi api = new InventoryApi();
 
+        Label accountStatus = new Label("Browsing as guest");
+        Button loginButton = new Button("Log in");
+        Button logoutButton = new Button("Log out");
+
+        logoutButton.disableProperty().bind(
+            loginButton.disableProperty().not()
+        );
+
+        HBox accountBar = new HBox(
+            10, accountStatus, loginButton, logoutButton
+        );
+
+        loginButton.setOnAction(event ->
+            showLogin(stage, api, accountStatus, loginButton)
+        );
+
+        logoutButton.setOnAction(event -> {
+            logoutButton.setText("Logging out…");
+            accountBar.setDisable(true);
+
+            api.logout().whenComplete((ignored, error) -> {
+                Platform.runLater(() -> {
+                    accountBar.setDisable(false);
+                    logoutButton.setText("Log out");
+
+                    if (error != null) {
+                        accountStatus.setText("Logout failed. Try again.");
+                    } else {
+                        loginButton.setDisable(false);
+                        accountStatus.setText("Browsing as guest");
+                    }
+                });
+            });
+        });
+
+        Runnable refreshAccount = () -> {
+            api.currentUser().whenComplete((user, error) -> {
+                Platform.runLater(() -> {
+                    if (error != null) {
+                        accountStatus.setText("Account status unavailable");
+                        return;
+                    }
+
+                    loginButton.setDisable(user != null);
+
+                    accountStatus.setText(
+                        user == null
+                            ? "Browsing as guest"
+                            : "Signed in as " + user.displayName()
+                                + " (" + user.role() + ")"
+                    );
+                });
+            });
+        };
+
+        stage.focusedProperty().addListener((observable, previous, focused) -> {
+            if (focused && !accountBar.isDisabled()) {
+                refreshAccount.run();
+            }
+        });
+
         Runnable search = () -> {
             searchButton.setDisable(true);
             searchField.setDisable(true);
@@ -163,7 +215,7 @@ public class InventoryApp extends Application {
         searchButton.setOnAction(event -> search.run());
         searchField.setOnAction(event -> search.run());
 
-        VBox root = new VBox(12, searchBar, status, results, details, documentationLink);
+        VBox root = new VBox(12, accountBar, searchBar, status, results, details, documentationLink);
         root.setPadding(new Insets(20));
         VBox.setVgrow(results, Priority.ALWAYS);
 
@@ -171,6 +223,90 @@ public class InventoryApp extends Application {
         stage.setScene(new Scene(root, 900, 600));
         stage.show();
         search.run();
+    }
+
+    private void showLogin(
+            Stage owner,
+            InventoryApi api,
+            Label accountStatus,
+            Button loginButton) {
+        Stage dialog = new Stage();
+        dialog.initOwner(owner);
+        dialog.initModality(Modality.WINDOW_MODAL);
+        dialog.setTitle("Log in");
+
+        TextField emailField = new TextField();
+        emailField.setPromptText("Email");
+
+        PasswordField passwordField = new PasswordField();
+        passwordField.setPromptText("Password");
+
+        Label message = new Label();
+        message.setWrapText(true);
+
+        Button submit = new Button("Log in");
+
+        Runnable login = () -> {
+            String email = emailField.getText().trim();
+            String password = passwordField.getText();
+
+            if (email.isEmpty() || password.isEmpty()) {
+                message.setText("Enter your email and password.");
+                return;
+            }
+
+            submit.setDisable(true);
+            emailField.setDisable(true);
+            passwordField.setDisable(true);
+            message.setText("Logging in…");
+
+            // Keep the dialog open until the request completes.
+            dialog.setOnCloseRequest(event -> event.consume());
+
+            api.login(email, password).whenComplete((user, error) -> {
+                Platform.runLater(() -> {
+                    passwordField.clear();
+                    dialog.setOnCloseRequest(null);
+
+                    if (error != null) {
+                        Throwable cause = error;
+                        while (cause.getCause() != null) {
+                            cause = cause.getCause();
+                        }
+
+                        message.setText(
+                            cause instanceof IllegalStateException
+                                ? cause.getMessage()
+                                : "Could not log in. Check the backend connection."
+                        );
+
+                        submit.setDisable(false);
+                        emailField.setDisable(false);
+                        passwordField.setDisable(false);
+                    } else {
+                        accountStatus.setText("Signed in as " + user.displayName() + " (" + user.role() + ")");
+                        loginButton.setDisable(true);
+                        dialog.close();
+                    }
+                });
+            });
+        };
+
+        submit.setOnAction(event -> login.run());
+        passwordField.setOnAction(event -> {
+            if (!submit.isDisabled()) {
+                login.run();
+            }
+        });
+
+        VBox content = new VBox(
+            12, new Label("Email"), emailField,
+            new Label("Password"), passwordField, message, submit
+        );
+        content.setPadding(new Insets(20));
+
+        dialog.setScene(new Scene(content, 380, 300));
+        dialog.show();
     }
 
     private static String display(String value) {

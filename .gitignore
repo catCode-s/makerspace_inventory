@@ -1,4 +1,13 @@
+# Java / Maven
+client/target/
+*.class
+
 build/
-.env
+build-*/
+*.exe
+*.obj
+*.pdb
+*.ilk
+
 config.local.json
-target/
+backend/sql/import_snapshot.sql
